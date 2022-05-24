@@ -1,8 +1,10 @@
 import re
-from office365.runtime.auth.user_credential import UserCredential
+from office365.runtime.auth.client_credential import ClientCredential
 from office365.sharepoint.client_context import ClientContext
 import sqlite3
 import configparser
+import os
+import getpass
 
 def get_sharepoint_folder_contents(ctx, dir):
     """
@@ -58,12 +60,22 @@ def scan_files():
     tenant_name = conf['sharepoint']['tenant_name']
     site = conf['sharepoint']['site']
     root_dir_relative_url = conf['sharepoint']['root_dir_relative_url']
-    # WORKING NICELY DOWN TO HERE
-    return
 
-    # DEFINETLY NEED TO DO SOME STUFF WITH SECRETS HERE AS THIS SHOULD NOT BE PUBLICALLY VISIBLE
-    user_credentials = UserCredential(conf.get('email.imap_user'),
-                                      conf.get('email.password'))
+    # Look for user credentials
+    usr = os.getenv('DOCMAP_USER')
+    pword = os.getenv('DOCMAP_PWD')
+
+    # Request them from user if not
+    if usr is None:
+        print(f"Provide username to log in to {site} sharepoint site.")
+        usr = input()
+
+    if pword is None:
+        print(f"Provide password for account {usr} on {site} sharepoint site.")
+        pword = getpass.getpass()
+
+    # Use these to generate user credential
+    user_credentials = UserCredential(usr,pword)
 
     # Connect to sharepoint
     ctx = ClientContext(f"{tenant_name}/sites/{site}").with_credentials(user_credentials)
@@ -77,18 +89,19 @@ def scan_files():
     # Now iterate over the directory contents collecting dictionaries of file data
     file_data = []
 
-    # REGEX to extract CID from end of file name _########.pdf
-    cid_regex = re.compile("(?<=_)[0-9]+(?=.pdf$)")
-
     while dir_filo:
 
         # Get the first entry from the FILO for directories and scan it
         this_dir = dir_filo.pop(0)
+        print(this_dir)
+        # THIS ASKS FOR MULTI-FACTOR AUTHENCATION
         contents = get_sharepoint_folder_contents(ctx, this_dir[1])
+        print(contents)
 
         # Contents is a dictionary of folders and files, so add the folders
         # onto the front of the directory FILO (depth first search)
         dir_filo = contents['folders'] + dir_filo
+        print(dir_filo)
 
         # If there are any files, they are 2-tuples of (name, office365.sharepoint.files.file.File)
         # which can be used to retrieve key information
