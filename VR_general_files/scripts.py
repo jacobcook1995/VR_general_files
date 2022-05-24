@@ -16,10 +16,9 @@ def _VR_file_search_cli():
     parser = argparse.ArgumentParser(description=desc, formatter_class=fmt)
 
     parser.add_argument('-c', '--credentials', default="private/secret.ini", type=str,
-                        action='append', help='Provide path to client crudentials to '
-                                              'access the sharepoint', dest='cpath')
+                        help='Provide path to client crudentials to '
+                             'access the sharepoint', dest='cpath')
 
     args = parser.parse_args()
 
-    print("Here")
     sp.scan_files(cpath=args.cpath)

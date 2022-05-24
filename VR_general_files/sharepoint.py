@@ -62,7 +62,7 @@ def scan_files(cpath: str):
     # Then read in credentials from secret config
     p_conf = configparser.ConfigParser()
 
-    p_conf.read('private/secret.ini')
+    p_conf.read(cpath)
 
     # Use these to generate user credential
     client_credentials = ClientCredential(p_conf['private-sharepoint']['client_id'],
