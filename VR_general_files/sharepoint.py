@@ -24,6 +24,18 @@ def get_sharepoint_folder_contents(ctx, dir):
     return dict(folders = [(sub.properties['ServerRelativeUrl'], sub) for sub in subdirs],
                 files = [(f.properties['Name'], f) for f in files])
 
+def get_folder_or_file_description(ctx, item):
+    """
+    Function to find the description (and Excel contents) of a specific sharepoint
+    file or folder.
+    """
+
+    # Get the full details
+    details = item.list_item_all_fields
+    ctx.load(details)
+    ctx.execute_query()
+
+    return details
 
 def scan_files(cpath: str):
     """Recursively scan files
@@ -78,21 +90,45 @@ def scan_files(cpath: str):
     dir_filo = [('root', root)]
 
     # Now iterate over the directory contents collecting dictionaries of file data
+    fold_data = []
     file_data = []
+    fold_n = 0
 
     while dir_filo:
 
         # Get the first entry from the FILO for directories and scan it
         this_dir = dir_filo.pop(0)
-        print(this_dir)
-        # THIS ASKS FOR MULTI-FACTOR AUTHENCATION
         contents = get_sharepoint_folder_contents(ctx, this_dir[1])
-        print(contents)
+        details = get_folder_or_file_description(ctx, this_dir[1])
+        # FROM DETAILS I CAN FIND AND PRINT THE PROPERTIES OF THE FOLDER/FILE
+        print(details.properties)
+
+        # BASICALLY NEED TO GIVE FOLDER A UID, A NAME, THE UID OF IT'S PARENT, + ANY COMMENTS, IGNORE EXCEL DATA
+        # EVERYTHING IS EASY BAR THE PARENT ID
+        if this_dir[0] == 'root':
+            # Generate root folder
+            fold_data.append(dict(unique_id = 0,
+                                  parent_id = -1,
+                                  name = "ROOT",
+                                  comments = None))
+            # Then generate all child folders
+            for fold in contents['folders']:
+                fold_n += 1
+                fold_props = fold[1].properties
+                # WORK OUT HOW TO FIND COMMENTS
+                fold_data.append(dict(unique_id = fold_n,
+                                      parent_id = 0,
+                                      name = fold_props['Name'],
+                                      comments = None))
+        # else:
+        #     # Generate child folders
+
+
+
 
         # Contents is a dictionary of folders and files, so add the folders
         # onto the front of the directory FILO (depth first search)
         dir_filo = contents['folders'] + dir_filo
-        print(dir_filo)
 
         # If there are any files, they are 2-tuples of (name, office365.sharepoint.files.file.File)
         # which can be used to retrieve key information
@@ -100,7 +136,7 @@ def scan_files(cpath: str):
 
             file_props = each_file[1].properties
 
-            print(file_props)
+            # RETURN HERE TO SHORTEN EXECUCTION WHILE DEVELOPING THE ABOVE
             return
 
             # OKAY SO THE BELOW IS STUFF WRITEN BY DAVID THAT IS POTENTIALLY USEFUL
@@ -123,6 +159,12 @@ def scan_files(cpath: str):
 
             path = file_props['ServerRelativeUrl'].split('/')
 
+            # OKAY SO DAVID IS SAVING DETAILS OF REPORTS INTO FILE DATA HERE
+            # IS A LIST THE BEST OPTION IN MY CASE?
+            # FOR FILES ALMOST CERTAINLY, CAN SPECIFY THE FOLDER
+            # I GUESS I WOULD HAVE TO CONSTRUCT A SEPERATE STRUCTURE FOR FOLDER DATA
+            # MAYBE GIVE EACH FOLDER A UID, AS NAMES ARE NOT GUARRENTEED TO BE UNIQUE
+            # FOR THE SAME REASON FILES NEED UIDS
             file_data.append(dict(unique_id = file_props['UniqueId'],
                                   filename = file_props['Name'],
                                   filesize = file_props['Length'],
@@ -131,86 +173,3 @@ def scan_files(cpath: str):
                                   academic_year = path[-3],
                                   marker_role = path[-2],
                                   relative_url = file_props['ServerRelativeUrl']))
-
-    # Now do checking on the results:
-    # Load presentations, marker roles and student ids, substituting underscores for spaces
-    presentations = db(db.presentations).select(db.presentations.name,
-                                                db.presentations.id).as_list()
-    presentation_lookup = {dt['name'].replace(' ', '_'): dt['id']
-                           for dt in presentations}
-
-    roles = db(db.marking_roles).select(db.marking_roles.name,
-                                        db.marking_roles.id).as_list()
-    role_lookup = {dt['name'].replace(' ', '_'): dt['id'] for dt in roles}
-
-    students = db(db.students).select(db.students.id, db.students.student_cid).as_list()
-    student_lookup = {dt['student_cid']: dt['id'] for dt in students}
-
-    # THINK ABOUT HOW I DEAL WITH PROBLEMS
-    # BR, LI, UL, CAT, P ARE ALL GLUON FUNCTIONS THAT I AM NOT USING
-
-    # # Insert what is available
-    # problems = []
-    #
-    # for this_file in file_data:
-    #
-    #     this_path = "{presentation}/{academic_year}/{marker_role}/{filename}".format(**this_file)
-    #
-    #     # Lookup ID numbers of presentation, role and student in
-    #     this_file['course_presentation_id'] = presentation_lookup.get(this_file['presentation'])
-    #     this_file['marker_role_id'] = role_lookup.get(this_file['marker_role'])
-    #     this_file['student_cid'] = student_lookup.get(this_file['cid'])
-    #
-    #     # Try and get the year as an integer
-    #     try:
-    #         this_file['academic_year'] = int(this_file['academic_year'])
-    #     except ValueError:
-    #         this_file['academic_year'] = None
-    #
-    #     # Report errors
-    #     these_problems = []
-    #
-    #     if (this_file['course_presentation_id'] is None):
-    #         these_problems.append("Unknown presentation")
-    #
-    #     if this_file['academic_year'] is None:
-    #         these_problems.append("Unknown year")
-    #
-    #     if this_file['marker_role_id'] is None:
-    #         these_problems.append("Unknown marker role")
-    #
-    #     if this_file['student_cid'] is None:
-    #         these_problems.append("Unknown CID")
-    #
-    #     if these_problems:
-    #         problems.append(LI(f"{this_path}", BR(), ','.join(these_problems)))
-    #
-    #
-    #     # Update or insert on what is found. The box id should be persistent, so moving files
-    #     # around should just update the records rather than creating new ones.
-    #     db.marking_files.update_or_insert(db.marking_files.unique_id == this_file['unique_id'],
-    #                                       **this_file)
-    #
-    # # Reporting
-    # report = P(f'Found {len(file_data)} files')
-    #
-    # if problems:
-    #     report += CAT(P(f'Issues found with {len(problems)} files: '), UL(*problems))
-    #
-    # db.commit()
-    #
-    # return dict(report=report)
-
-
-def download_url(record):
-    """
-    Simple helper to get the sharepoint address, which will require user login.
-    :param records:
-    :return:
-    """
-
-    conf = current.configuration
-    tenant_name = conf.get('sharepoint.tenant_name')
-    url = f"{tenant_name}/:t:/r/{record.relative_url}"
-
-    return url
