@@ -24,18 +24,25 @@ def get_sharepoint_folder_contents(ctx, dir):
     return dict(folders = [(sub.properties['ServerRelativeUrl'], sub) for sub in subdirs],
                 files = [(f.properties['Name'], f) for f in files])
 
-def get_folder_or_file_description(ctx, item):
+def get_item_metadata(path, tenant_name, site, root_dir_relative_url, client_credentials):
     """
-    Function to find the description (and Excel contents) of a specific sharepoint
-    file or folder.
+    Function that finds the metadata for a particular item (folder or file) and
+    from this the description (and Excel content) is extracted.
     """
 
-    # Get the full details
-    details = item.list_item_all_fields
-    ctx.load(details)
-    ctx.execute_query()
+    # Determine full path to item
+    if path == 'root':
+        hndl = f"{tenant_name}/sites/{site}/{root_dir_relative_url}"
+    else:
+        hndl = f"{tenant_name}/{path}"
 
-    return details
+    # SO PROBLEM IS THAT NO LISTS ARE DEFINED AT THIS LEVEL
+    # ctx = ClientContext(hndl).with_credentials(client_credentials)
+    # list_obj = ctx.web.lists.get_by_title("User Information List").root_folder.files
+    # ctx.load(list_obj)
+    # ctx.execute_query()
+
+    return hndl
 
 def scan_files(cpath: str):
     """Recursively scan files
@@ -86,6 +93,23 @@ def scan_files(cpath: str):
     # Get the root directory
     root = ctx.web.get_folder_by_server_relative_url(root_dir_relative_url)
 
+    # HOW TO DESCEND TO LOWER LIST????????
+    folds = ctx.web.lists.get_by_title("Virtual_Rainforest_Documents").root_folder.folders
+    ctx.load(folds)
+    ctx.execute_query()
+
+    for folder in folds:
+        item = folder.list_item_all_fields
+        ctx.load(item)
+        ctx.execute_query()
+        test = item.is_property_available("Excelcontents")
+        print(test)
+        test2 = item.is_property_available("Description")
+        print(test2)
+        # print(dir(item))
+        # is_property_available => Maybe useful
+        print(item.properties)
+
     # Scan the directory for files, until this list is emptied.
     dir_filo = [('root', root)]
 
@@ -99,9 +123,13 @@ def scan_files(cpath: str):
         # Get the first entry from the FILO for directories and scan it
         this_dir = dir_filo.pop(0)
         contents = get_sharepoint_folder_contents(ctx, this_dir[1])
-        details = get_folder_or_file_description(ctx, this_dir[1])
-        # FROM DETAILS I CAN FIND AND PRINT THE PROPERTIES OF THE FOLDER/FILE
-        print(details.properties)
+
+
+        # Find the relevant metadata for this folder
+        # m_data = get_item_metadata(this_dir[0], tenant_name, site, root_dir_relative_url,
+        #                            client_credentials)
+
+        # print(m_data.properties)
 
         # BASICALLY NEED TO GIVE FOLDER A UID, A NAME, THE UID OF IT'S PARENT, + ANY COMMENTS, IGNORE EXCEL DATA
         # EVERYTHING IS EASY BAR THE PARENT ID
