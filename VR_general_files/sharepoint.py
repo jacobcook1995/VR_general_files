@@ -31,18 +31,20 @@ def get_item_metadata(path, tenant_name, site, root_dir_relative_url, client_cre
     """
 
     # Determine full path to item
-    if path == 'root':
-        hndl = f"{tenant_name}/sites/{site}/{root_dir_relative_url}"
-    else:
-        hndl = f"{tenant_name}/{path}"
+    # if path == 'root':
+    #     hndl = f"{tenant_name}/sites/{site}/{root_dir_relative_url}"
+    # else:
+    #     hndl = f"{tenant_name}/{path}"
+
+    hndl = f"{tenant_name}/sites/{site}"
 
     # SO PROBLEM IS THAT NO LISTS ARE DEFINED AT THIS LEVEL
-    # ctx = ClientContext(hndl).with_credentials(client_credentials)
-    # list_obj = ctx.web.lists.get_by_title("User Information List").root_folder.files
-    # ctx.load(list_obj)
-    # ctx.execute_query()
+    ctx = ClientContext(hndl).with_credentials(client_credentials)
+    list_obj = ctx.web.lists.get_by_title("Virtual_Rainforest_Documents").root_folder.folders
+    ctx.load(list_obj)
+    ctx.execute_query()
 
-    return hndl
+    return list_obj
 
 def scan_files(cpath: str):
     """Recursively scan files
@@ -93,22 +95,25 @@ def scan_files(cpath: str):
     # Get the root directory
     root = ctx.web.get_folder_by_server_relative_url(root_dir_relative_url)
 
-    # HOW TO DESCEND TO LOWER LIST????????
-    folds = ctx.web.lists.get_by_title("Virtual_Rainforest_Documents").root_folder.folders
-    ctx.load(folds)
-    ctx.execute_query()
-
-    for folder in folds:
-        item = folder.list_item_all_fields
-        ctx.load(item)
-        ctx.execute_query()
-        test = item.is_property_available("Excelcontents")
-        print(test)
-        test2 = item.is_property_available("Description")
-        print(test2)
-        # print(dir(item))
-        # is_property_available => Maybe useful
-        print(item.properties)
+    # # HOW TO DESCEND TO LOWER LIST????????
+    # folds = ctx.web.lists.get_by_title("Virtual_Rainforest_Documents").root_folder.folders
+    # ctx.load(folds)
+    # ctx.execute_query()
+    # # print(folds.properties)
+    # # print(dir(folds))
+    # # return
+    #
+    # for folder in folds:
+    #     item = folder.list_item_all_fields
+    #     ctx.load(item)
+    #     ctx.execute_query()
+    #     test = item.is_property_available("Excelcontents")
+    #     print(test)
+    #     test2 = item.is_property_available("Description")
+    #     print(test2)
+    #     # print(dir(item))
+    #     # is_property_available => Maybe useful
+    #     print(item.properties)
 
     # Scan the directory for files, until this list is emptied.
     dir_filo = [('root', root)]
@@ -122,6 +127,17 @@ def scan_files(cpath: str):
 
         # Get the first entry from the FILO for directories and scan it
         this_dir = dir_filo.pop(0)
+        print(this_dir[0])
+        folder_item = this_dir[1].list_item_all_fields
+        print(dir(folder_item))
+        test = folder_item.get_property("Description")
+        ctx.execute_query()
+        print(test)
+        # print(dir(root.list_item_all_fields))
+        # test = this_dir[1].list_item_all_fields.field_values
+        # ctx.load(test)
+        # ctx.execute_query()
+        # print(test)
         contents = get_sharepoint_folder_contents(ctx, this_dir[1])
 
 
