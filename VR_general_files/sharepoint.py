@@ -24,27 +24,6 @@ def get_sharepoint_folder_contents(ctx, dir):
     return dict(folders = [(sub.properties['ServerRelativeUrl'], sub) for sub in subdirs],
                 files = [(f.properties['Name'], f) for f in files])
 
-def get_item_metadata(path, tenant_name, site, root_dir_relative_url, client_credentials):
-    """
-    Function that finds the metadata for a particular item (folder or file) and
-    from this the description (and Excel content) is extracted.
-    """
-
-    # Determine full path to item
-    # if path == 'root':
-    #     hndl = f"{tenant_name}/sites/{site}/{root_dir_relative_url}"
-    # else:
-    #     hndl = f"{tenant_name}/{path}"
-
-    hndl = f"{tenant_name}/sites/{site}"
-
-    # SO PROBLEM IS THAT NO LISTS ARE DEFINED AT THIS LEVEL
-    ctx = ClientContext(hndl).with_credentials(client_credentials)
-    list_obj = ctx.web.lists.get_by_title("Virtual_Rainforest_Documents").root_folder.folders
-    ctx.load(list_obj)
-    ctx.execute_query()
-
-    return list_obj
 
 def scan_files(cpath: str):
     """Recursively scan files
@@ -95,26 +74,6 @@ def scan_files(cpath: str):
     # Get the root directory
     root = ctx.web.get_folder_by_server_relative_url(root_dir_relative_url)
 
-    # # HOW TO DESCEND TO LOWER LIST????????
-    # folds = ctx.web.lists.get_by_title("Virtual_Rainforest_Documents").root_folder.folders
-    # ctx.load(folds)
-    # ctx.execute_query()
-    # # print(folds.properties)
-    # # print(dir(folds))
-    # # return
-    #
-    # for folder in folds:
-    #     item = folder.list_item_all_fields
-    #     ctx.load(item)
-    #     ctx.execute_query()
-    #     test = item.is_property_available("Excelcontents")
-    #     print(test)
-    #     test2 = item.is_property_available("Description")
-    #     print(test2)
-    #     # print(dir(item))
-    #     # is_property_available => Maybe useful
-    #     print(item.properties)
-
     # Scan the directory for files, until this list is emptied.
     dir_filo = [('root', root)]
 
@@ -122,52 +81,48 @@ def scan_files(cpath: str):
     fold_data = []
     file_data = []
     fold_n = 0
+    file_n = 0
 
     while dir_filo:
 
         # Get the first entry from the FILO for directories and scan it
         this_dir = dir_filo.pop(0)
-        print(this_dir[0])
-        folder_item = this_dir[1].list_item_all_fields
-        print(dir(folder_item))
-        test = folder_item.get_property("Description")
-        ctx.execute_query()
-        print(test)
-        # print(dir(root.list_item_all_fields))
-        # test = this_dir[1].list_item_all_fields.field_values
-        # ctx.load(test)
-        # ctx.execute_query()
-        # print(test)
         contents = get_sharepoint_folder_contents(ctx, this_dir[1])
 
-
-        # Find the relevant metadata for this folder
-        # m_data = get_item_metadata(this_dir[0], tenant_name, site, root_dir_relative_url,
-        #                            client_credentials)
-
-        # print(m_data.properties)
-
-        # BASICALLY NEED TO GIVE FOLDER A UID, A NAME, THE UID OF IT'S PARENT, + ANY COMMENTS, IGNORE EXCEL DATA
         # EVERYTHING IS EASY BAR THE PARENT ID
         if this_dir[0] == 'root':
             # Generate root folder
             fold_data.append(dict(unique_id = 0,
                                   parent_id = -1,
                                   name = "ROOT",
-                                  comments = None))
+                                  relative_url = f"/sites/{site}/{root_dir_relative_url}",
+                                  description = None))
+            # Set parent ID as zero
+            pID = 0
             # Then generate all child folders
             for fold in contents['folders']:
                 fold_n += 1
                 fold_props = fold[1].properties
-                # WORK OUT HOW TO FIND COMMENTS
                 fold_data.append(dict(unique_id = fold_n,
-                                      parent_id = 0,
+                                      parent_id = pID,
                                       name = fold_props['Name'],
-                                      comments = None))
-        # else:
-        #     # Generate child folders
-
-
+                                      relative_url = fold_props['ServerRelativeUrl'],
+                                      # NEED TO WORK OUT HOW TO FIND DESCRIPTION
+                                      description = "INSERT DESCRIPTION HERE"))
+        else:
+            # Find ID of parent folder
+            par = next(item for item in fold_data if item["relative_url"] == this_dir[0])
+            pID = par["unique_id"]
+            # The generate child folders
+            for fold in contents['folders']:
+                fold_n += 1
+                fold_props = fold[1].properties
+                fold_data.append(dict(unique_id = fold_n,
+                                      parent_id = pID,
+                                      name = fold_props['Name'],
+                                      relative_url = fold_props['ServerRelativeUrl'],
+                                      # NEED TO WORK OUT HOW TO FIND DESCRIPTION
+                                      description = "INSERT DESCRIPTION HERE"))
 
 
         # Contents is a dictionary of folders and files, so add the folders
@@ -178,42 +133,18 @@ def scan_files(cpath: str):
         # which can be used to retrieve key information
         for each_file in contents['files']:
 
+            file_n += 1
             file_props = each_file[1].properties
+            # DOES USING THE PARENT ID WORK??
+            file_data.append(dict(unique_id = file_n,
+                                  folder_id = pID,
+                                  name = file_props['Name'],
+                                  relative_url = file_props['ServerRelativeUrl'],
+                                  # NEED TO WORK OUT HOW TO FIND DESCRIPTION
+                                  description = "INSERT DESCRIPTION HERE",
+                                  excel_sheets = "INSERT EXCEL CONTENTS HERE"))
 
-            # RETURN HERE TO SHORTEN EXECUCTION WHILE DEVELOPING THE ABOVE
-            return
 
-            # OKAY SO THE BELOW IS STUFF WRITEN BY DAVID THAT IS POTENTIALLY USEFUL
-            # BUT HAS TO BE MODIFIED TO THIS USE CASE
-
-            # Can't see how to filter to only PDFs using the sharepoint API, so
-            # do it here.
-            if not file_props['Name'].endswith('.pdf'):
-                continue
-
-            # Get the student CID
-            cid = cid_regex.search(file_props['Name'])
-            if cid is not None:
-                cid = int(cid.group())
-
-            # The files are expected to be structured within root_dir_relative_url as:
-            #   Presentation/Year/Role/File.pdf
-            # because the file url is always relative to the account root, need to trim down to the
-            # final 3 directories of the path name
-
-            path = file_props['ServerRelativeUrl'].split('/')
-
-            # OKAY SO DAVID IS SAVING DETAILS OF REPORTS INTO FILE DATA HERE
-            # IS A LIST THE BEST OPTION IN MY CASE?
-            # FOR FILES ALMOST CERTAINLY, CAN SPECIFY THE FOLDER
-            # I GUESS I WOULD HAVE TO CONSTRUCT A SEPERATE STRUCTURE FOR FOLDER DATA
-            # MAYBE GIVE EACH FOLDER A UID, AS NAMES ARE NOT GUARRENTEED TO BE UNIQUE
-            # FOR THE SAME REASON FILES NEED UIDS
-            file_data.append(dict(unique_id = file_props['UniqueId'],
-                                  filename = file_props['Name'],
-                                  filesize = file_props['Length'],
-                                  cid = cid,
-                                  presentation = path[-4],
-                                  academic_year = path[-3],
-                                  marker_role = path[-2],
-                                  relative_url = file_props['ServerRelativeUrl']))
+    # NEED TO CREATE A DATABASE HERE TO SAVE ALL THE DATA INTO
+    # I GUESS AS TWO SEPERATE TABLES
+    return
