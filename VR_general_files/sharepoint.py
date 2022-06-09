@@ -147,4 +147,29 @@ def scan_files(cpath: str):
 
     # NEED TO CREATE A DATABASE HERE TO SAVE ALL THE DATA INTO
     # I GUESS AS TWO SEPERATE TABLES
+    # create database table for the folder structure
+    cur = db.cursor()
+    q = ('CREATE TABLE folders'
+         '(folder_id int PRIMARY KEY, parent_id int, name text, rel_url text, '
+         'description text)')
+    cur.execute(q)
+
+    for fold in fold_data:
+        q = (f"INSERT INTO folders VALUES ({fold['unique_id']}, {fold['parent_id']}, "
+             f"'{fold['name']}', '{fold['relative_url']}', '{fold['description']}')")
+        cur.execute(q)
+
+    q = ('CREATE TABLE files'
+         '(file_id int PRIMARY KEY, folder_id int, name text, rel_url text, '
+         'description text, excel_sheets text)')
+    cur.execute(q)
+
+    for file in file_data:
+        q = (f"INSERT INTO files VALUES ({file['unique_id']}, {file['folder_id']}, "
+             f"'{file['name']}', '{file['relative_url']}', '{file['description']}',"
+             f" '{file['excel_sheets']}')")
+        cur.execute(q)
+
+    db.commit()
+
     return
