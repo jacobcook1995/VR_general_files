@@ -24,6 +24,13 @@ def get_sharepoint_folder_contents(ctx, dir):
     return dict(folders = [(sub.properties['ServerRelativeUrl'], sub) for sub in subdirs],
                 files = [(f.properties['Name'], f) for f in files])
 
+def expand_file_details(ctx, file_url):
+    # Expand file context
+    file = ctx.web.get_file_by_server_relative_path(file_url).expand(["listItemAllFields"]).get().execute_query()
+    desc = file.listItemAllFields.get_property("Description")
+    print(file.listItemAllFields.properties)
+    return
+
 
 def scan_files(cpath: str):
     """Recursively scan files
@@ -135,7 +142,7 @@ def scan_files(cpath: str):
 
             file_n += 1
             file_props = each_file[1].properties
-            # DOES USING THE PARENT ID WORK??
+            expand_file_details(ctx, file_props['ServerRelativeUrl'])
             file_data.append(dict(unique_id = file_n,
                                   folder_id = pID,
                                   name = file_props['Name'],
