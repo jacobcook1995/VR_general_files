@@ -131,3 +131,6 @@ dmypy.json
 # Ignore private except for the appconfig template
 private/*
 !private/appconfig_template.ini
+
+# Database locally created, so should not be uploaded
+database/
