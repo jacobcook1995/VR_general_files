@@ -25,10 +25,35 @@ def get_sharepoint_folder_contents(ctx, dir):
                 files = [(f.properties['Name'], f) for f in files])
 
 def expand_file_details(ctx, file_url):
-    # Expand file context
-    file = ctx.web.get_file_by_server_relative_path(file_url).expand(["listItemAllFields"]).get().execute_query()
-    desc = file.listItemAllFields.get_property("Description")
-    print(file.listItemAllFields.properties)
+    # MAYBE GET A LIST RATHER THAN A FILE
+    # files = ctx.web.lists
+    # ctx.load(files)
+    # ctx.execute_query()
+    # for file in files:
+    #     # print(file.properties)
+    #     print(file.title)
+
+
+    oList = ctx.web.lists.get_by_title("Virtual_Rainforest_Documents")
+    items = oList.items
+    ctx.load(items)
+    ctx.execute_query()
+    for item in items:
+        file = item.file
+        ctx.load(file)
+        ctx.execute_query()
+        print(file.properties)
+
+    raise TypeError
+    # # Expand file context
+    # file = ctx.web.get_file_by_server_relative_path(file_url).expand(["listItemAllFields"])
+    # ctx.load(file)
+    # ctx.execute_query()
+    # # List all fields
+    # item = file.listItemAllFields
+    # ctx.load(item)
+    # ctx.execute_query()
+    # print(item.properties)
     return
 
 
