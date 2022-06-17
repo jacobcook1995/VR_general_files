@@ -4,12 +4,12 @@ from office365.sharepoint.client_context import ClientContext
 import sqlite3
 import configparser
 
+
 def get_sharepoint_folder_contents(ctx, dir):
     """
     Function to provide a dictionary of folders and files within a
     sharepoint folder.
     """
-
 
     # Get the sub-directories
     subdirs = dir.folders
@@ -21,8 +21,11 @@ def get_sharepoint_folder_contents(ctx, dir):
     ctx.load(files)
     ctx.execute_query()
 
-    return dict(folders = [(sub.properties['ServerRelativeUrl'], sub) for sub in subdirs],
-                files = [(f.properties['Name'], f) for f in files])
+    return dict(
+        folders=[(sub.properties["ServerRelativeUrl"], sub) for sub in subdirs],
+        files=[(f.properties["Name"], f) for f in files],
+    )
+
 
 # THIS IS MORE A FUNCTION THAT I'M USING TO EXPERIMENT THAN ANYTHING ELSE
 # IT CURRENTLY GETS THE LIST OF ALL ITEMS IN Virtual_Rainforest_Documents AS A LIST
@@ -67,19 +70,18 @@ def scan_files(cpath: str):
         url = f"{tenant_name}/:t:/s/{site}/{cryptic_share_code}
     """
 
-
     # Generate database to store file structure and comments in
-    db = sqlite3.connect('database/file_struct.db')
+    db = sqlite3.connect("database/file_struct.db")
 
     # Get the configured sharepoint tenant, site and relative url
     # and credentials for a college role user that has been given access
     # to that relative URL.
     conf = configparser.ConfigParser()
-    conf.read('private/appconfig_template.ini')
+    conf.read("private/appconfig_template.ini")
 
-    tenant_name = conf['sharepoint']['tenant_name']
-    site = conf['sharepoint']['site']
-    root_dir_relative_url = conf['sharepoint']['root_dir_relative_url']
+    tenant_name = conf["sharepoint"]["tenant_name"]
+    site = conf["sharepoint"]["site"]
+    root_dir_relative_url = conf["sharepoint"]["root_dir_relative_url"]
 
     # Then read in credentials from secret config
     p_conf = configparser.ConfigParser()
@@ -87,17 +89,21 @@ def scan_files(cpath: str):
     p_conf.read(cpath)
 
     # Use these to generate user credential
-    client_credentials = ClientCredential(p_conf['private-sharepoint']['client_id'],
-                                          p_conf['private-sharepoint']['client_secret'])
+    client_credentials = ClientCredential(
+        p_conf["private-sharepoint"]["client_id"],
+        p_conf["private-sharepoint"]["client_secret"],
+    )
 
     # Connect to sharepoint
-    ctx = ClientContext(f"{tenant_name}/sites/{site}").with_credentials(client_credentials)
+    ctx = ClientContext(f"{tenant_name}/sites/{site}").with_credentials(
+        client_credentials
+    )
 
     # Get the root directory
     root = ctx.web.get_folder_by_server_relative_url(root_dir_relative_url)
 
     # Scan the directory for files, until this list is emptied.
-    dir_filo = [('root', root)]
+    dir_filo = [("root", root)]
 
     # Now iterate over the directory contents collecting dictionaries of file data
     fold_data = []
@@ -112,84 +118,108 @@ def scan_files(cpath: str):
         contents = get_sharepoint_folder_contents(ctx, this_dir[1])
 
         # EVERYTHING IS EASY BAR THE PARENT ID
-        if this_dir[0] == 'root':
+        if this_dir[0] == "root":
             # Generate root folder
-            fold_data.append(dict(unique_id = 0,
-                                  parent_id = -1,
-                                  name = "ROOT",
-                                  relative_url = f"/sites/{site}/{root_dir_relative_url}",
-                                  description = None))
+            fold_data.append(
+                dict(
+                    unique_id=0,
+                    parent_id=-1,
+                    name="ROOT",
+                    relative_url=f"/sites/{site}/{root_dir_relative_url}",
+                    description=None,
+                )
+            )
             # Set parent ID as zero
             pID = 0
             # Then generate all child folders
-            for fold in contents['folders']:
+            for fold in contents["folders"]:
                 fold_n += 1
                 fold_props = fold[1].properties
-                fold_data.append(dict(unique_id = fold_n,
-                                      parent_id = pID,
-                                      name = fold_props['Name'],
-                                      relative_url = fold_props['ServerRelativeUrl'],
-                                      # NEED TO WORK OUT HOW TO FIND DESCRIPTION
-                                      description = "INSERT DESCRIPTION HERE"))
+                fold_data.append(
+                    dict(
+                        unique_id=fold_n,
+                        parent_id=pID,
+                        name=fold_props["Name"],
+                        relative_url=fold_props["ServerRelativeUrl"],
+                        # NEED TO WORK OUT HOW TO FIND DESCRIPTION
+                        description="INSERT DESCRIPTION HERE",
+                    )
+                )
         else:
             # Find ID of parent folder
-            par = next(item for item in fold_data if item["relative_url"] == this_dir[0])
+            par = next(
+                item for item in fold_data if item["relative_url"] == this_dir[0]
+            )
             pID = par["unique_id"]
             # The generate child folders
-            for fold in contents['folders']:
+            for fold in contents["folders"]:
                 fold_n += 1
                 fold_props = fold[1].properties
-                fold_data.append(dict(unique_id = fold_n,
-                                      parent_id = pID,
-                                      name = fold_props['Name'],
-                                      relative_url = fold_props['ServerRelativeUrl'],
-                                      # NEED TO WORK OUT HOW TO FIND DESCRIPTION
-                                      description = "INSERT DESCRIPTION HERE"))
-
+                fold_data.append(
+                    dict(
+                        unique_id=fold_n,
+                        parent_id=pID,
+                        name=fold_props["Name"],
+                        relative_url=fold_props["ServerRelativeUrl"],
+                        # NEED TO WORK OUT HOW TO FIND DESCRIPTION
+                        description="INSERT DESCRIPTION HERE",
+                    )
+                )
 
         # Contents is a dictionary of folders and files, so add the folders
         # onto the front of the directory FILO (depth first search)
-        dir_filo = contents['folders'] + dir_filo
+        dir_filo = contents["folders"] + dir_filo
 
         # If there are any files, they are 2-tuples of (name, office365.sharepoint.files.file.File)
         # which can be used to retrieve key information
-        for each_file in contents['files']:
+        for each_file in contents["files"]:
 
             file_n += 1
             file_props = each_file[1].properties
-            expand_file_details(ctx, file_props['ServerRelativeUrl'])
-            file_data.append(dict(unique_id = file_n,
-                                  folder_id = pID,
-                                  name = file_props['Name'],
-                                  relative_url = file_props['ServerRelativeUrl'],
-                                  # NEED TO WORK OUT HOW TO FIND DESCRIPTION
-                                  description = "INSERT DESCRIPTION HERE",
-                                  excel_sheets = "INSERT EXCEL CONTENTS HERE"))
-
+            expand_file_details(ctx, file_props["ServerRelativeUrl"])
+            file_data.append(
+                dict(
+                    unique_id=file_n,
+                    folder_id=pID,
+                    name=file_props["Name"],
+                    relative_url=file_props["ServerRelativeUrl"],
+                    # NEED TO WORK OUT HOW TO FIND DESCRIPTION
+                    description="INSERT DESCRIPTION HERE",
+                    excel_sheets="INSERT EXCEL CONTENTS HERE",
+                )
+            )
 
     # NEED TO CREATE A DATABASE HERE TO SAVE ALL THE DATA INTO
     # I GUESS AS TWO SEPERATE TABLES
     # create database table for the folder structure
     cur = db.cursor()
-    q = ('CREATE TABLE folders'
-         '(folder_id int PRIMARY KEY, parent_id int, name text, rel_url text, '
-         'description text)')
+    q = (
+        "CREATE TABLE folders"
+        "(folder_id int PRIMARY KEY, parent_id int, name text, rel_url text, "
+        "description text)"
+    )
     cur.execute(q)
 
     for fold in fold_data:
-        q = (f"INSERT INTO folders VALUES ({fold['unique_id']}, {fold['parent_id']}, "
-             f"'{fold['name']}', '{fold['relative_url']}', '{fold['description']}')")
+        q = (
+            f"INSERT INTO folders VALUES ({fold['unique_id']}, {fold['parent_id']}, "
+            f"'{fold['name']}', '{fold['relative_url']}', '{fold['description']}')"
+        )
         cur.execute(q)
 
-    q = ('CREATE TABLE files'
-         '(file_id int PRIMARY KEY, folder_id int, name text, rel_url text, '
-         'description text, excel_sheets text)')
+    q = (
+        "CREATE TABLE files"
+        "(file_id int PRIMARY KEY, folder_id int, name text, rel_url text, "
+        "description text, excel_sheets text)"
+    )
     cur.execute(q)
 
     for file in file_data:
-        q = (f"INSERT INTO files VALUES ({file['unique_id']}, {file['folder_id']}, "
-             f"'{file['name']}', '{file['relative_url']}', '{file['description']}',"
-             f" '{file['excel_sheets']}')")
+        q = (
+            f"INSERT INTO files VALUES ({file['unique_id']}, {file['folder_id']}, "
+            f"'{file['name']}', '{file['relative_url']}', '{file['description']}',"
+            f" '{file['excel_sheets']}')"
+        )
         cur.execute(q)
 
     db.commit()
