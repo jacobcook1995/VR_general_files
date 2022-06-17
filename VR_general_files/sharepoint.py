@@ -50,7 +50,7 @@ def expand_file_details(ctx, file_url):
     return
 
 
-def scan_files(cpath: str):
+def scan_files(cpath: str, out: str):
     """Recursively scan files
 
     This function takes a configured document root directory on a sharepoint site
@@ -71,27 +71,21 @@ def scan_files(cpath: str):
     """
 
     # Generate database to store file structure and comments in
-    db = sqlite3.connect("database/file_struct.db")
+    db = sqlite3.connect(out)
 
-    # Get the configured sharepoint tenant, site and relative url
-    # and credentials for a college role user that has been given access
-    # to that relative URL.
+    # Get the configured sharepoint tenant, site and relative url and client_id
+    # and client_secret credentials for the application
     conf = configparser.ConfigParser()
-    conf.read("private/appconfig_template.ini")
+    conf.read(cpath)
 
     tenant_name = conf["sharepoint"]["tenant_name"]
     site = conf["sharepoint"]["site"]
     root_dir_relative_url = conf["sharepoint"]["root_dir_relative_url"]
 
-    # Then read in credentials from secret config
-    p_conf = configparser.ConfigParser()
-
-    p_conf.read(cpath)
-
     # Use these to generate user credential
     client_credentials = ClientCredential(
-        p_conf["private-sharepoint"]["client_id"],
-        p_conf["private-sharepoint"]["client_secret"],
+        conf["sharepoint"]["client_id"],
+        conf["sharepoint"]["client_secret"],
     )
 
     # Connect to sharepoint
