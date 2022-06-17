@@ -125,40 +125,28 @@ def scan_files(cpath: str, out: str):
             )
             # Set parent ID as zero
             pID = 0
-            # Then generate all child folders
-            for fold in contents["folders"]:
-                fold_n += 1
-                fold_props = fold[1].properties
-                fold_data.append(
-                    dict(
-                        unique_id=fold_n,
-                        parent_id=pID,
-                        name=fold_props["Name"],
-                        relative_url=fold_props["ServerRelativeUrl"],
-                        # NEED TO WORK OUT HOW TO FIND DESCRIPTION
-                        description="INSERT DESCRIPTION HERE",
-                    )
-                )
+
         else:
             # Find ID of parent folder
             par = next(
                 item for item in fold_data if item["relative_url"] == this_dir[0]
             )
             pID = par["unique_id"]
-            # The generate child folders
-            for fold in contents["folders"]:
-                fold_n += 1
-                fold_props = fold[1].properties
-                fold_data.append(
-                    dict(
-                        unique_id=fold_n,
-                        parent_id=pID,
-                        name=fold_props["Name"],
-                        relative_url=fold_props["ServerRelativeUrl"],
-                        # NEED TO WORK OUT HOW TO FIND DESCRIPTION
-                        description="INSERT DESCRIPTION HERE",
-                    )
+
+        # Now generate child folders
+        for fold in contents["folders"]:
+            fold_n += 1
+            fold_props = fold[1].properties
+            fold_data.append(
+                dict(
+                    unique_id=fold_n,
+                    parent_id=pID,
+                    name=fold_props["Name"],
+                    relative_url=fold_props["ServerRelativeUrl"],
+                    # NEED TO WORK OUT HOW TO FIND DESCRIPTION
+                    description="INSERT DESCRIPTION HERE",
                 )
+            )
 
         # Contents is a dictionary of folders and files, so add the folders
         # onto the front of the directory FILO (depth first search)
