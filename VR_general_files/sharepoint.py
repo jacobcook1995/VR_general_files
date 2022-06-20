@@ -29,7 +29,7 @@ def get_sharepoint_folder_contents(ctx, dir):
 
 # Currently this function extracts the description of a file and then returns it
 def expand_file_details(ctx, file_url):
-    # Make list of all folders and files
+    # Find relevant file
     file = (
         ctx.web.get_file_by_server_relative_url(file_url)
         .expand(["versions", "listItemAllFields/properties"])
@@ -48,7 +48,7 @@ def expand_file_details(ctx, file_url):
 
 # Identical function for the folders
 def expand_folder_details(ctx, fold_url):
-    # Make list of all folders and files
+    # Find relevant folder
     fold = (
         ctx.web.get_folder_by_server_relative_url(fold_url)
         .expand(["versions", "listItemAllFields/properties"])
@@ -57,6 +57,25 @@ def expand_folder_details(ctx, fold_url):
     )
     desc = fold.list_item_all_fields.get_property("Properties").get(
         "OData__x005f_ExtendedDescription"
+    )
+    # Replace blank strings with None
+    if desc == "":
+        desc = None
+
+    return desc
+
+
+# Currently this function extracts the description of a file and then returns it
+def expand_xlsx_details(ctx, file_url):
+    # Find relevant (.xlsx) file
+    file = (
+        ctx.web.get_file_by_server_relative_url(file_url)
+        .expand(["versions", "listItemAllFields/properties"])
+        .get()
+        .execute_query()
+    )
+    desc = file.listItemAllFields.get_property("Properties").get(
+        "Excelcontents"
     )
     # Replace blank strings with None
     if desc == "":
@@ -182,6 +201,13 @@ def scan_files(cpath: str, out: str):
             desc = expand_file_details(ctx, file_props["ServerRelativeUrl"])
             if desc == None:
                 miss_file_desc += 1
+            # Check that xlsx files have sheet descriptions
+            if file_props["Name"].endswith(".xlsx"):
+                xlsx_shts = expand_xlsx_details(ctx, file_props["ServerRelativeUrl"])
+                if xlsx_shts == None:
+                    miss_xlsx_desc += 1
+            else:
+                xlsx_shts = None
             file_data.append(
                 dict(
                     unique_id=file_n,
@@ -189,7 +215,7 @@ def scan_files(cpath: str, out: str):
                     name=file_props["Name"],
                     relative_url=file_props["ServerRelativeUrl"],
                     description=desc,
-                    excel_sheets="INSERT EXCEL CONTENTS HERE",
+                    excel_sheets=xlsx_shts,
                 )
             )
 
