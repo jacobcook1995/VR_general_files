@@ -74,9 +74,7 @@ def expand_xlsx_details(ctx, file_url):
         .get()
         .execute_query()
     )
-    desc = file.listItemAllFields.get_property("Properties").get(
-        "Excelcontents"
-    )
+    desc = file.listItemAllFields.get_property("Properties").get("Excelcontents")
     # Replace blank strings with None
     if desc == "":
         desc = None
