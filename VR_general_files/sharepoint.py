@@ -4,6 +4,7 @@ from office365.sharepoint.client_context import ClientContext
 import sqlite3
 import configparser
 
+
 def get_sharepoint_folder_contents(ctx, dir):
     """
     Function to provide a dictionary of folders and files within a
@@ -36,6 +37,25 @@ def expand_file_details(ctx, file_url):
         .execute_query()
     )
     desc = file.listItemAllFields.get_property("Properties").get(
+        "OData__x005f_ExtendedDescription"
+    )
+    # Replace blank strings with None
+    if desc == "":
+        desc = None
+
+    return desc
+
+
+# Identical function for the folders
+def expand_folder_details(ctx, fold_url):
+    # Make list of all folders and files
+    fold = (
+        ctx.web.get_folder_by_server_relative_url(fold_url)
+        .expand(["versions", "listItemAllFields/properties"])
+        .get()
+        .execute_query()
+    )
+    desc = fold.list_item_all_fields.get_property("Properties").get(
         "OData__x005f_ExtendedDescription"
     )
     # Replace blank strings with None
@@ -136,14 +156,16 @@ def scan_files(cpath: str, out: str):
         for fold in contents["folders"]:
             fold_n += 1
             fold_props = fold[1].properties
+            desc = expand_folder_details(ctx, fold_props["ServerRelativeUrl"])
+            if desc == None:
+                miss_fold_desc += 1
             fold_data.append(
                 dict(
                     unique_id=fold_n,
                     parent_id=pID,
                     name=fold_props["Name"],
                     relative_url=fold_props["ServerRelativeUrl"],
-                    # NEED TO WORK OUT HOW TO FIND DESCRIPTION
-                    description="INSERT DESCRIPTION HERE",
+                    description=desc,
                 )
             )
 
@@ -208,6 +230,6 @@ def scan_files(cpath: str, out: str):
     print(f"Summary:")
     print(f"The directory has {miss_file_desc} files without a description.")
     print(f"It also has {miss_fold_desc} folders without a description.")
-    print(f"Finally, {miss_xlsx_desc} xlsx files are missing sheet descriptions")
+    print(f"Finally, {miss_xlsx_desc} xlsx files are missing sheet descriptions.")
 
     return
