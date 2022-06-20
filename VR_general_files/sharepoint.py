@@ -4,7 +4,6 @@ from office365.sharepoint.client_context import ClientContext
 import sqlite3
 import configparser
 
-
 def get_sharepoint_folder_contents(ctx, dir):
     """
     Function to provide a dictionary of folders and files within a
@@ -39,6 +38,10 @@ def expand_file_details(ctx, file_url):
     desc = file.listItemAllFields.get_property("Properties").get(
         "OData__x005f_ExtendedDescription"
     )
+    # Replace blank strings with None
+    if desc == "":
+        desc = None
+
     return desc
 
 
@@ -97,13 +100,17 @@ def scan_files(cpath: str, out: str):
     fold_n = 0
     file_n = 0
 
+    # counters for files, folders, excels sheets with descriptions
+    miss_file_desc = 0
+    miss_fold_desc = 0
+    miss_xlsx_desc = 0
+
     while dir_filo:
 
         # Get the first entry from the FILO for directories and scan it
         this_dir = dir_filo.pop(0)
         contents = get_sharepoint_folder_contents(ctx, this_dir[1])
 
-        # EVERYTHING IS EASY BAR THE PARENT ID
         if this_dir[0] == "root":
             # Generate root folder
             fold_data.append(
@@ -151,21 +158,19 @@ def scan_files(cpath: str, out: str):
             file_n += 1
             file_props = each_file[1].properties
             desc = expand_file_details(ctx, file_props["ServerRelativeUrl"])
-            print(desc)
+            if desc == None:
+                miss_file_desc += 1
             file_data.append(
                 dict(
                     unique_id=file_n,
                     folder_id=pID,
                     name=file_props["Name"],
                     relative_url=file_props["ServerRelativeUrl"],
-                    # NEED TO WORK OUT HOW TO FIND DESCRIPTION
-                    description="INSERT DESCRIPTION HERE",
+                    description=desc,
                     excel_sheets="INSERT EXCEL CONTENTS HERE",
                 )
             )
 
-    # NEED TO CREATE A DATABASE HERE TO SAVE ALL THE DATA INTO
-    # I GUESS AS TWO SEPERATE TABLES
     # create database table for the folder structure
     cur = db.cursor()
     q = (
@@ -198,5 +203,11 @@ def scan_files(cpath: str, out: str):
         cur.execute(q)
 
     db.commit()
+
+    # Give user a summary of missing file, folder, and Excel sheet descriptions
+    print(f"Summary:")
+    print(f"The directory has {miss_file_desc} files without a description.")
+    print(f"It also has {miss_fold_desc} folders without a description.")
+    print(f"Finally, {miss_xlsx_desc} xlsx files are missing sheet descriptions")
 
     return
