@@ -36,4 +36,4 @@ def _VR_file_search_cli():
 
     args = parser.parse_args()
 
-    sp.scan_files(cpath=args.cpath,out=args.out)
+    sp.scan_files(cpath=args.cpath, out=args.out)
