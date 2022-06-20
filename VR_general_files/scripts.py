@@ -21,10 +21,19 @@ def _VR_file_search_cli():
         "--credentials",
         default="private/secret.ini",
         type=str,
-        help="Provide path to client crudentials to " "access the sharepoint",
+        help="Provide path to client crudentials to access the sharepoint",
         dest="cpath",
+    )
+
+    parser.add_argument(
+        "-d",
+        "--database",
+        default="database/file_struct.db",
+        type=str,
+        help="Provide path to save file structure as a database",
+        dest="out",
     )
 
     args = parser.parse_args()
 
-    sp.scan_files(cpath=args.cpath)
+    sp.scan_files(cpath=args.cpath,out=args.out)
