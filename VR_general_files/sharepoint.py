@@ -30,8 +30,15 @@ def get_sharepoint_folder_contents(ctx, dir):
 # Currently this function extracts the description of a file and then returns it
 def expand_file_details(ctx, file_url):
     # Make list of all folders and files
-    file = ctx.web.get_file_by_server_relative_url(file_url).expand(["versions", "listItemAllFields/properties"]).get().execute_query()
-    desc = file.listItemAllFields.get_property("Properties").get('OData__x005f_ExtendedDescription')
+    file = (
+        ctx.web.get_file_by_server_relative_url(file_url)
+        .expand(["versions", "listItemAllFields/properties"])
+        .get()
+        .execute_query()
+    )
+    desc = file.listItemAllFields.get_property("Properties").get(
+        "OData__x005f_ExtendedDescription"
+    )
     return desc
 
 
